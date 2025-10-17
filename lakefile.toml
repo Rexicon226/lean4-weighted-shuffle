@@ -5,7 +5,3 @@ defaultTargets = ["weighted-tree"]
 [[lean_exe]]
 name = "weighted-tree"
 root = "Main"
-
-[[require]]
-name = "mathlib"
-scope = "leanprover-community"

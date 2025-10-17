@@ -1,5 +1,4 @@
 import Std
-import Mathlib
 
 /--
 Radix of the tree.
@@ -35,7 +34,7 @@ def computeHeight (numElements : Nat) : Nat × Nat :=
     . apply Nat.lt_of_not_le
       assumption
     .
-      nth_rewrite 1 [← Nat.mul_one powRh]
+      rw (occs := .pos [1]) [← Nat.mul_one powRh]
       apply Nat.mul_lt_mul_of_pos_left
       . decide -- R is a constant, it's always > 1
       . exact Nat.pos_of_ne_zero d
@@ -58,8 +57,8 @@ def mkWeightedTree (numElements : Nat) : WeightedTree :=
     internal_node_count := heights.2 }
 
 /--
- Adds weight to the tree. Requires a prop `h` that the weight is no zero, as this
- tree implementation does no support having zero weight nodes.
+ Adds weight to the tree. Requires a prop `h` that the weight is not zero, as this
+ tree implementation does not support having zero weight nodes.
 -/
 def addWeight (t : WeightedTree) (weight : Nat) (_ : weight ≠ 0) : WeightedTree :=
   let rec loop (i : Nat) (h_rem : Nat) (tree : Array Element) : Array Element :=
@@ -80,9 +79,9 @@ def addWeight (t : WeightedTree) (weight : Nat) (_ : weight ≠ 0) : WeightedTre
             arr
         loop parent h' updated
   let i := t.internal_node_count + t.unremoved_count
-  let updatedElements := loop i t.height t.tree
+  -- let updatedElements := loop i t.height t.tree
   { t with
-    tree := updatedElements
+    -- tree := updatedElements
     unremoved_count := t.unremoved_count + 1
     total_count := t.total_count + 1
     unremoved_weight := t.unremoved_weight + weight
