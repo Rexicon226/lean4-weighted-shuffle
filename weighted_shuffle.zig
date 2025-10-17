@@ -1,4 +1,5 @@
 const std = @import("std");
+const chacha = @import("chacha.zig");
 
 /// See comment above `ChaCha.uniform` to understand the difference.
 pub const Mode = enum {
@@ -87,7 +88,7 @@ pub const Mode = enum {
 ///
 pub fn SamplerTree(mode: Mode) type {
     return struct {
-        tree: [1024]Element, // TODO: compute size correctly
+        tree: [8]Element, // TODO: compute size correctly
 
         total_count: u64,
         total_weight: u64,
@@ -96,6 +97,8 @@ pub fn SamplerTree(mode: Mode) type {
 
         internal_node_count: u64,
         height: u64,
+
+        rng: chacha.ChaCha(.twenty),
 
         const Self = @This();
 
@@ -126,6 +129,8 @@ pub fn SamplerTree(mode: Mode) type {
 
                 .internal_node_count = internal_count,
                 .height = height,
+
+                .rng = .init(@splat(0)),
             };
         }
 
@@ -151,7 +156,8 @@ pub fn SamplerTree(mode: Mode) type {
             var i = self.internal_node_count + self.unremoved_count;
             for (0..self.height) |_| {
                 const parent = (i - 1) / R;
-                const child_index = (i - 1) - (R * parent); // in [0, R)
+                // const child_index = (i - 1) - (R * parent); // in [0, R)
+                const child_index = (i - 1) % R;
                 for (child_index..R - 1) |k| self.tree[parent].left_sum[k] += weight;
                 i = parent;
             }
@@ -256,8 +262,16 @@ pub fn SamplerTree(mode: Mode) type {
 pub fn main() !void {
     const S = SamplerTree(.mod);
 
-    var example = S.init(1);
+    var example = S.init(10);
     example.addWeight(3);
+    // example.addWeight(10);
+
+    for (example.tree) |r| {
+        for (r.left_sum) |e| std.debug.print("{:0>4} ", .{e});
+        std.debug.print("\n", .{});
+    }
+
+    std.debug.print("sample: {}\n", .{try example.sample()});
 
     std.debug.print("unremoved weight: {}\n", .{example.unremoved_weight});
 }
