@@ -3,15 +3,10 @@ import Std
 /--
 Radix of the tree.
 -/
-def R : Nat := 9
+def R : Nat := 5
 
-structure Element where
-  left_sum : Vector Nat (R - 1)
-  deriving Repr
-
-namespace Element
-def EMPTY : Element := { left_sum := .replicate (R - 1) 0 }
-end Element
+abbrev Element : Type := Vector Nat (R - 1)
+def empty_element : Element := .replicate (R - 1) 0
 
 structure WeightedTree where
   internal_node_count : Nat
@@ -22,10 +17,7 @@ structure WeightedTree where
   unremoved_weight : Nat
   height : Nat
 
-/--
-Shows that the main loop of `computeHeight` will terminate.
--/
-theorem computeHeight_decreasing {numElements powRh : Nat} (h : ¬ numElements ≤ powRh) (d : powRh ≠ 0) :
+theorem computeHeight_lemma {numElements powRh : Nat} (h : ¬ numElements ≤ powRh) (d : powRh ≠ 0) :
     numElements - (powRh * R) < numElements - powRh := by
   simp_wf
   apply Nat.sub_lt_sub_left
@@ -33,7 +25,7 @@ theorem computeHeight_decreasing {numElements powRh : Nat} (h : ¬ numElements �
     exact h
   · rewrite (occs := .pos [1]) [← Nat.mul_one powRh]
     apply Nat.mul_lt_mul_of_pos_left
-    · decide  -- R > 1
+    · decide -- R > 1
     · exact Nat.pos_of_ne_zero d
 
 def computeHeight (numElements : Nat) : Nat × Nat :=
@@ -45,49 +37,65 @@ def computeHeight (numElements : Nat) : Nat × Nat :=
       go (height + 1) (internal + powRh) (powRh * R)
         (Nat.ne_of_gt (Nat.mul_pos powRh_pos (by decide)))
   termination_by numElements - powRh
-  decreasing_by apply computeHeight_decreasing <;> assumption
+  decreasing_by apply computeHeight_lemma <;> assumption
   go 0 0 1 (by decide)
 
-#guard computeHeight 0 = (0, 0)
-#guard computeHeight 1 = (0, 0)
-#guard computeHeight 384 = (3, 91)
-#guard computeHeight 1024 = (4, 820)
+-- TODO: these assume R = 9
+-- #guard computeHeight 0 = (0, 0)
+-- #guard computeHeight 1 = (0, 0)
+-- #guard computeHeight 384 = (3, 91)
+-- #guard computeHeight 1024 = (4, 820)
 
 def mkWeightedTree (numElements : Nat) : WeightedTree :=
   let heights := computeHeight numElements
-  let tree := Vector.replicate heights.2 Element.EMPTY
+  let tree := Vector.replicate heights.2 empty_element
   { tree := tree
-    total_count := numElements
+    height := heights.1
+    internal_node_count := heights.2
+
+    total_count := 0
     total_weight := 0
     unremoved_count := 0
-    unremoved_weight := 0
+    unremoved_weight := 0 }
 
-    height := heights.1
-    internal_node_count := heights.2 }
+/--
+  Updates the left sums in an element. Broadcasts `weight` to  [child_index, R - 1) elements.
+-/
+def addWeight_updateSums (parent_element : Element) (child_index : Fin (R - 1)) (weight : Nat) : Element :=
+  let rec go (k : Nat) (hk : k < R - 1) (acc : Element) : Element :=
+    let acc := acc.set k (acc.get ⟨k, hk⟩ + weight) hk
+    if hn : k + 1 < R - 1 then
+      go (k + 1) (hn) acc
+    else
+      acc
+  go child_index.val child_index.isLt parent_element
 
 /--
  Adds weight to the tree. Requires a prop `h` that the weight is not zero, as this
  tree implementation does not support having zero weight nodes.
 -/
 def addWeight (t : WeightedTree) (weight : Nat) (_ : weight ≠ 0) : WeightedTree :=
-  let rec loop (i : Nat) (h_rem : Nat) (node_count : Nat) (tree : Vector Element node_count) : Vector Element node_count :=
-    match h_rem with
+  let rec loop (i : Nat) (height_remaining : Nat) (tree : Vector Element t.internal_node_count) : Vector Element t.internal_node_count :=
+    match height_remaining with
     | 0 => tree
-    | Nat.succ h' =>
-        let parent := (i - 1) / R
-        let child_index : Fin R := ⟨(i - 1) - (R * parent), by
-          rw [← Nat.mod_eq_sub_mul_div]
-          exact Nat.mod_lt _ (by decide)⟩
+    | Nat.succ height' =>
+        let parent : Fin t.internal_node_count  :=
+          ⟨(i - 1) / R, by
+            sorry -- TODO
+          ⟩
+        let child_index : Fin R :=
+          ⟨(i - 1) - (R * parent), by
+            rw [← Nat.mod_eq_sub_mul_div]
+            exact Nat.mod_lt _ (by decide)
+          ⟩
         let updated := Id.run do
-            let mut arr := tree
-            let mut parentElement := arr[parent]'sorry -- TODO
-            for k in [child_index : R] do
-              parentElement := { left_sum := parentElement.left_sum.set k (parentElement.left_sum[k]! + weight) sorry } -- TODO
-            arr := arr.set parent parentElement sorry -- TODO
-            arr
-        loop parent h' node_count updated
+            if chk : child_index < (R - 1) then
+              tree.set parent (addWeight_updateSums tree[parent] (child_index.castLT chk) weight)
+            else
+              tree -- Nothing to update
+        loop parent height' updated
   let i := t.internal_node_count + t.unremoved_count
-  let updatedElements := loop i t.height t.internal_node_count t.tree
+  let updatedElements := loop i t.height t.tree
   { t with
     tree := updatedElements
     unremoved_count := t.unremoved_count + 1
@@ -95,7 +103,5 @@ def addWeight (t : WeightedTree) (weight : Nat) (_ : weight ≠ 0) : WeightedTre
     unremoved_weight := t.unremoved_weight + weight
     total_weight := t.total_weight + weight }
 
-def exampleTree : WeightedTree := mkWeightedTree 11
-#eval exampleTree
-
--- #eval! addWeight exampleTree 3  (by decide)
+def exampleTree : WeightedTree := mkWeightedTree 7
+#eval! addWeight exampleTree 100  (by decide)

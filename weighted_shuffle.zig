@@ -88,7 +88,7 @@ pub const Mode = enum {
 ///
 pub fn SamplerTree(mode: Mode) type {
     return struct {
-        tree: [8]Element, // TODO: compute size correctly
+        tree: []Element, // TODO: compute size correctly
 
         total_count: u64,
         total_weight: u64,
@@ -105,7 +105,7 @@ pub fn SamplerTree(mode: Mode) type {
         /// The radix of the tree. This implementation is fully generic over the radix, but performance
         /// will be really bad if it isn't on the `1+2^n` line, and `9` works well empirically, especially
         /// because it allows a child's sums to fit into AV512 registers, `(R - 1) * 64 == 512`.
-        const R = 9;
+        const R = 5;
 
         const V = @Vector(R - 1, u64);
         const C = @Vector(R - 1, u16);
@@ -117,10 +117,15 @@ pub fn SamplerTree(mode: Mode) type {
             const zero: Element = .{ .left_sum = @splat(0) };
         };
 
-        pub fn init(num_elements: u64) Self {
+        pub fn init(allocator: std.mem.Allocator, num_elements: u64) !Self {
             const height, const internal_count = computeHeight(num_elements);
+
+            const tree = try allocator.alloc(Element, internal_count);
+            errdefer allocator.free(tree);
+            @memset(tree, .zero);
+
             return .{
-                .tree = @splat(.zero), // zero out the tree
+                .tree = tree,
 
                 .total_count = 0,
                 .total_weight = 0,
@@ -134,8 +139,8 @@ pub fn SamplerTree(mode: Mode) type {
             };
         }
 
-        pub fn deinit(self: *Self) void {
-            _ = self;
+        pub fn deinit(self: *Self, allocator: std.mem.Allocator) void {
+            allocator.free(self.tree);
         }
 
         fn computeHeight(num_elements: u64) struct { u64, u64 } {
@@ -154,11 +159,24 @@ pub fn SamplerTree(mode: Mode) type {
             std.debug.assert(weight != 0);
 
             var i = self.internal_node_count + self.unremoved_count;
+
+            std.debug.print("i: {}\n", .{i});
+
             for (0..self.height) |_| {
                 const parent = (i - 1) / R;
-                // const child_index = (i - 1) - (R * parent); // in [0, R)
-                const child_index = (i - 1) % R;
-                for (child_index..R - 1) |k| self.tree[parent].left_sum[k] += weight;
+
+                std.debug.print("parent: {} {}\n", .{ i, parent });
+
+                const child_index = (i - 1) - (R * parent); // in [0, R)
+                std.debug.print("child index: {}\n", .{child_index});
+                std.debug.print("R - 1: {}\n", .{R - 1});
+                std.debug.print("diff: {}\n", .{(R - 1) - child_index});
+
+                std.debug.print("before\n", .{});
+                for (child_index..R - 1) |k| {
+                    std.debug.print("k: {}\n", .{k});
+                    self.tree[parent].left_sum[k] += weight;
+                }
                 i = parent;
             }
 
@@ -260,10 +278,25 @@ pub fn SamplerTree(mode: Mode) type {
 }
 
 pub fn main() !void {
+    const allocator = std.heap.smp_allocator;
     const S = SamplerTree(.mod);
 
-    var example = S.init(10);
-    example.addWeight(3);
+    var example = try S.init(allocator, 7);
+    defer example.deinit(allocator);
+
+    for ([_]u8{
+        100,
+        // 80,
+        // 50,
+        // 31,
+        // 27,
+        // 14,
+        // 6,
+    }) |i| {
+        example.addWeight(i);
+    }
+
+    // example.addWeight(3);
     // example.addWeight(10);
 
     for (example.tree) |r| {
@@ -271,7 +304,7 @@ pub fn main() !void {
         std.debug.print("\n", .{});
     }
 
-    std.debug.print("sample: {}\n", .{try example.sample()});
+    // std.debug.print("sample: {}\n", .{try example.sample()});
 
-    std.debug.print("unremoved weight: {}\n", .{example.unremoved_weight});
+    // std.debug.print("unremoved weight: {}\n", .{example.unremoved_weight});
 }
