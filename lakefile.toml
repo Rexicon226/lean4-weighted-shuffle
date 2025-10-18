@@ -1,7 +1,0 @@
-name = "weighted-tree"
-version = "0.1.0"
-defaultTargets = ["weighted-tree"]
-
-[[lean_exe]]
-name = "weighted-tree"
-root = "Main"
