@@ -105,7 +105,7 @@ pub fn SamplerTree(mode: Mode) type {
         /// The radix of the tree. This implementation is fully generic over the radix, but performance
         /// will be really bad if it isn't on the `1+2^n` line, and `9` works well empirically, especially
         /// because it allows a child's sums to fit into AV512 registers, `(R - 1) * 64 == 512`.
-        const R = 5;
+        const R = 9;
 
         const V = @Vector(R - 1, u64);
         const C = @Vector(R - 1, u16);
