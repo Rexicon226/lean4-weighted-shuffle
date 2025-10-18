@@ -164,17 +164,8 @@ pub fn SamplerTree(mode: Mode) type {
 
             for (0..self.height) |_| {
                 const parent = (i - 1) / R;
-
-                std.debug.print("parent: {} {}\n", .{ i, parent });
-
                 const child_index = (i - 1) - (R * parent); // in [0, R)
-                std.debug.print("child index: {}\n", .{child_index});
-                std.debug.print("R - 1: {}\n", .{R - 1});
-                std.debug.print("diff: {}\n", .{(R - 1) - child_index});
-
-                std.debug.print("before\n", .{});
                 for (child_index..R - 1) |k| {
-                    std.debug.print("k: {}\n", .{k});
                     self.tree[parent].left_sum[k] += weight;
                 }
                 i = parent;
@@ -281,17 +272,19 @@ pub fn main() !void {
     const allocator = std.heap.smp_allocator;
     const S = SamplerTree(.mod);
 
-    var example = try S.init(allocator, 7);
+    var example = try S.init(allocator, 1000);
     defer example.deinit(allocator);
 
     for ([_]u8{
         100,
-        // 80,
-        // 50,
-        // 31,
-        // 27,
-        // 14,
-        // 6,
+        80,
+        50,
+        31,
+        27,
+        14,
+        6,
+        6,
+        6,
     }) |i| {
         example.addWeight(i);
     }
@@ -299,10 +292,10 @@ pub fn main() !void {
     // example.addWeight(3);
     // example.addWeight(10);
 
-    for (example.tree) |r| {
-        for (r.left_sum) |e| std.debug.print("{:0>4} ", .{e});
-        std.debug.print("\n", .{});
-    }
+    // for (example.tree) |r| {
+    //     for (r.left_sum) |e| std.debug.print("{:0>4} ", .{e});
+    //     std.debug.print("\n", .{});
+    // }
 
     // std.debug.print("sample: {}\n", .{try example.sample()});
 
